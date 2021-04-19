@@ -1,6 +1,6 @@
 export correlate_day, stack_h5, preprocess, correlate_block, LLE_geo, add_location, rfft_raw,
         cc_medianmute, cc_medianmute!, name_corr, save_named_corr, load_corrs, write_jld2,
-        foldersize, get_dict_name, list_name
+        foldersize, list_name
 
 
 # main processing functions
@@ -313,12 +313,7 @@ function foldersize(dir=".")
     end
     return size*10e-10
 end
-function get_dict_name(file::String)
-    """ Helper function for get_scedc_files."""
-    station = convert(String, split(split(file,"/")[end],"_")[1])
-    component = split(file,"/")[end][10:12]
-    return string(station, "_", component)
-end
+
 function list_name(s::String)
     name = convert(String, split(s,"/")[end])
     if occursin("continuous", s)
