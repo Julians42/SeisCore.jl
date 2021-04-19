@@ -1,5 +1,5 @@
-# SeisCore :earth_americas: :zap: :cloud: :ski:
-**SeisCore.jl** is a Julia Package for our [C4 Project](https://github.com/Julians42/SeisCore.jl). Optimized for HPC on AWS EC2 and Batch. 
+# SeisCore :earth_americas: :cloud: :ski:
+**SeisCore.jl** is a Julia Package for our [C4 Project](https://github.com/Julians42/C4-Project.jl). Optimized for HPC on AWS EC2 and Batch. 
 
 ## Installation
 
