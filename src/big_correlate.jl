@@ -10,7 +10,7 @@ function correlate_pair(src::FFTData, rec::FFTData, pref::String="CORR", params:
         cc_medianmute!(C, 10.) # remove correlation windows with high noise
         stack!(C)
         name = join(split(name_corr(C), ".")[1:2],".")
-        save_named_corr(C,"$pref/$name/$(C.comp)")
+        save_named_corr(C,"root/$pref/$name/$(C.comp)")
     catch e
         println(e)
     end
