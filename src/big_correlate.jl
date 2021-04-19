@@ -10,7 +10,7 @@ function correlate_pair(src::FFTData, rec::FFTData, pref::String="CORR", params:
         cc_medianmute!(C, 10.) # remove correlation windows with high noise
         stack!(C)
         name = join(split(name_corr(C), ".")[1:2],".")
-        save_named_corr(C,"root/$pref/$name/$(C.comp)")
+        save_named_corr(C,"$(params["rootdir"])/$pref/$name/$(C.comp)")
     catch e
         println(e)
     end
@@ -112,14 +112,14 @@ function stack_auto(name::String, startdate::Date=startdate)
     yr = Dates.year(startdate)
     # stack autocorrelations 
 
-    CORROUT = expanduser("autocorrelations/$name/")
+    CORROUT = expanduser(joinpath(params["rootdir"],"autocorrelations/$name/"))
     if !isdir(CORROUT)
         mkpath(CORROUT)
     end
     filename = joinpath(CORROUT,"$(yr)_$(month)_$name.h5") # get output filename
 
     # Get list of files to save
-    autocorr_list = glob("AUTOCORR/$name*/*/*.jld2")
+    autocorr_list = glob("AUTOCORR/$name*/*/*.jld2", params["rootdir"])
     components = ["EE", "EN", "EZ", "NE", "NN", "NZ", "ZE", "ZN", "ZZ"]
 
     C = load_corr(autocorr_list[1], convert(String, split(autocorr_list[1],"/")[end-1])) # sample autocorr for meta
@@ -144,7 +144,7 @@ function stack_auto(name::String, startdate::Date=startdate)
         # stack per month 
         for comp in components
             #comp_files = filter(f -> convert(String, split(f, "/")[end-1]) == comp, autocorr_list)
-            comp_files = glob("AUTOCORR/$name*/$comp/*.jld2") # uni-component files
+            comp_files = glob("AUTOCORR/$name*/$comp/*.jld2", params["rootdir"]) # uni-component files
             autocorrs = [load_corr(f, comp) for f in comp_files]
 
             autocorr_mean = SeisNoise.stack(sum(autocorrs), allstack=true, stacktype=mean)
@@ -171,7 +171,7 @@ function stack_corr(name::String, startdate::Date=startdate, prefix::String = "C
     yr = Dates.year(startdate)
     # stack autocorrelations 
 
-    CORROUT = expanduser("correlations/$name/")
+    CORROUT = expanduser(joinpath(params["rootdir"], "correlations/$name/"))
     if !isdir(CORROUT)
         mkpath(CORROUT)
     end
@@ -179,10 +179,10 @@ function stack_corr(name::String, startdate::Date=startdate, prefix::String = "C
     # r = r"(?<=$(name)).*"
     components = ["EE","EN","EZ", "NE", "NN","NZ", "ZE", "ZN", "ZZ"]
 
-    receivers = glob("$prefix/$name/*/*")
+    receivers = glob("$prefix/$name/*/*", params["rootdir"])
     receivers = Set([join(split(x, ".")[end-2:end-1], ".") for x in receivers]) # just get reciever names
     println(receivers)
-    corr_list = glob("$prefix/$name*/*/*")
+    corr_list = glob("$prefix/$name*/*/*", params["rootdir"])
     C = load_corr(corr_list[1], convert(String, split(corr_list[1],"/")[end-1]))
     source_loc = GeoLoc(lat = C.loc.lat, lon = C.loc.lon, el = C.loc.el)
     h5open(filename, "cw") do file 
@@ -209,7 +209,7 @@ function stack_corr(name::String, startdate::Date=startdate, prefix::String = "C
                 # Cr = load_corr(sample_r, "ZZ")
                 rec_station = split(rec, ".")[2]
                 #rec_loc = LLE_geo(rec_station, all_stations)
-                rec_loc = load_fft(glob("ffts/*/*/$rec*BHZ*")[1], "BHZ").loc # get location from fft - perhaps a faster way to do this. 
+                rec_loc = load_fft(glob("ffts/*/*/$rec*BHZ*", params["rootdir"])[1], "BHZ").loc # get location from fft - perhaps a faster way to do this. 
                 if !haskey(read(file), "$rec/meta")
                     write(file, "$rec/meta/lon", rec_loc.lon)
                     write(file, "$rec/meta/lat", rec_loc.lat)
@@ -220,7 +220,7 @@ function stack_corr(name::String, startdate::Date=startdate, prefix::String = "C
                 end
                 for comp in components
                     # load correlations for this receiver by component 
-                    files = glob("$prefix/$name/$comp/*$rec*")
+                    files = glob("$prefix/$name/$comp/*$rec*", params["rootdir"])
                     corrs = [load_corr(f, comp) for f in files]
     
                     # implement various stacktypes
@@ -286,17 +286,17 @@ function correlate_big(dd::Date, startdate::Date = startdate, params::Dict = par
     println("There are $(length(filelist_basin)) node files and $(length(scedc_files)) SCEDC files available for $path.")
 
     # download scedc and seisbasin data
-    ec2download(aws, "scedc-pds", scedc_files, "/root/data")
-    ec2download(aws, "seisbasin", filelist_basin, "/root/data")
+    ec2download(aws, "scedc-pds", scedc_files, joinpath(params["rootdir"],"data"))
+    ec2download(aws, "seisbasin", filelist_basin, joinpath(params["rootdir"],"data"))
     println("Download complete!")
 
 
     # preprocess - broadbands and seismometers are processed separately
-    allf = glob("data/*/$yr/$path/*", "root")
+    allf = glob("data/*/$yr/$path/*", params["rootdir"])
     println(allf)
     println(readdir())
-    println(readdir("root/data"))
-    accelerometers = filter(x -> isfile(x), joinpath.("/root/data/continuous_waveforms/$yr/$path/", node_query))
+    println(readdir("$(params["rootdir"])/data"))
+    accelerometers = filter(x -> isfile(x), joinpath.("/$(params["rootdir"])/data/continuous_waveforms/$yr/$path/", node_query))
     broadbands = setdiff(allf, accelerometers) # get the rest of the files 
 
     @eval @everywhere accelerometers, broadbands = $accelerometers, $broadbands
@@ -309,15 +309,15 @@ function correlate_big(dd::Date, startdate::Date = startdate, params::Dict = par
     end
 
     # autocorrelations    
-    fft_list_100 = glob("ffts/$path/100/*.jld2", "root")
+    fft_list_100 = glob("ffts/$path/100/*.jld2", params["rootdir"])
     println("FFT list 100 is $(length(fft_list_100)) stations long")
     fft_100_stations = unique([join(split(elt, ".")[1:2],".") for elt in fft_list_100]) # get stations to iterate over
     @eval @everywhere fft_100_stations = $fft_100_stations
     pmap(x -> autocorrelate(x, fft_list_100, params), fft_100_stations)
 
 
-    fft_paths_20 = sort(glob("ffts/$path/20/*", "root")) # alphabetic sort for all stations so that diagonal files are made correctly
-    fft_paths_1 = sort(glob("ffts/$path/1/*", "root")) # alphabetic sort for all stations so that diagonal files are made correctly
+    fft_paths_20 = sort(glob("ffts/$path/20/*", params["rootdir"])) # alphabetic sort for all stations so that diagonal files are made correctly
+    fft_paths_1 = sort(glob("ffts/$path/1/*", params["rootdir"])) # alphabetic sort for all stations so that diagonal files are made correctly
     println("There are $(length(fft_paths_20)) fft datas for the 20 HZ correlations")
     # run 20 HZ correlations
     chunks_20HZ, off_chunk_names_20HZ = get_blocks(fft_paths_20, params);
@@ -344,8 +344,8 @@ function correlate_big(dd::Date, startdate::Date = startdate, params::Dict = par
     T1O = @elapsed robust_pmap(chunk -> offdiag_chunks(chunk, "CORR_1HZ", false, params), off_chunk_names_1HZ) # run mega correlations
 
     # Correlation summary
-    println("All $(length(glob("CORR_*/*/*/$path*", "root"))) Inter-station Correlations computed in $(T20D+T20O + T1D + T1O) seconds")
-    try; rm("root/data/continuous_waveforms/", recursive=true); catch e; println(e); end
+    println("All $(length(glob("CORR_*/*/*/$path*", params["rootdir"]))) Inter-station Correlations computed in $(T20D + T20O + T1D + T1O) seconds")
+    try; rm("$(params["rootdir"])/data/continuous_waveforms/", recursive=true); catch e; println(e); end
 end
 
 function print_thing(f)
