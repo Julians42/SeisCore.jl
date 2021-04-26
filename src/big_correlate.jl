@@ -1,6 +1,6 @@
 # Functions for large C4 correlation job 
 export correlate_pair, autocorrelate, diag_chunks, offdiag_chunks, preprocess2, get_blocks,
-        stack_auto, stack_corr, correlate_big, stack_all, print_thing
+        stack_auto, stack_corr, correlate_big, stack_all
 
 
 # correlation helper functions
@@ -327,7 +327,7 @@ function correlate_big(dd::Date, startdate::Date = startdate, params::Dict = par
     T20D = @elapsed robust_pmap(chunk -> diag_chunks(convert(Array,chunk), "CORR_20HZ", true, params), chunks_20HZ)
 
     # correlate off-diagonal chunks
-    @eval @everywhere off_chunk_names_20HZ = $ off_chunk_names_20HZ
+    @eval @everywhere off_chunk_names_20HZ = $off_chunk_names_20HZ
     T20O = @elapsed robust_pmap(chunk -> offdiag_chunks(chunk, "CORR_20HZ", true, params), off_chunk_names_20HZ) # run mega correlations
 
 
@@ -346,8 +346,4 @@ function correlate_big(dd::Date, startdate::Date = startdate, params::Dict = par
     # Correlation summary
     println("All $(length(glob("CORR_*/*/*/$path*", params["rootdir"]))) Inter-station Correlations computed in $(T20D + T20O + T1D + T1O) seconds")
     try; rm("$(params["rootdir"])/data/continuous_waveforms/", recursive=true); catch e; println(e); end
-end
-
-function print_thing(f)
-    println(f)
 end
