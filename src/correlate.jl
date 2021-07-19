@@ -40,6 +40,9 @@ function correlate_day(dd::Date, sources::Array{String,1}=sources, all_stations:
     Tcorrelate = @elapsed pmap(rec_files -> correlate_block(sources, collect(rec_files), maxlag), reciever_blocks)
     rm("data/continuous_waveforms", recursive=true) # cleanup raw data
 end
+
+
+
 function stack_h5(tf::String, postfix::String)
     """ Stack and reformat correlations from source `tf`. 
         Postfix is used for naming files (ex 2019, B1_nodes etc)
@@ -109,6 +112,8 @@ function stack_h5(tf::String, postfix::String)
     end
 end
 
+
+
 # subroutines
 function preprocess(file::String,  accelerometer::Bool=false, rootdir::String="", samp_rates::Array{Float64, 1}=[20., 100.],
                         freqmin::Float64=freqmin, freqmax::Float64=freqmax, cc_step::Int64=cc_step, 
@@ -167,6 +172,9 @@ function preprocess(file::String,  accelerometer::Bool=false, rootdir::String=""
         println(e)
     end
 end
+
+
+
 function correlate_block(src::Array{String,1}, rec::Array{String,1}, maxlag::Float64)
     """ 
         Correlation function for sources to receivers with stacking by day
@@ -191,6 +199,8 @@ function correlate_block(src::Array{String,1}, rec::Array{String,1}, maxlag::Flo
     end
 end
 
+
+
 # helper functions - simplify larger coding blocks above 
 function LLE_geo(network, station, df)
     """ Find station matching location and return geoloc object"""
@@ -210,6 +220,9 @@ function LLE_geo(network, station, df)
         end
     end
 end
+
+
+
 function add_location(s::SeisData,df::DataFrame)
     """ Adds locations to SeisData object from a dataframe """
     try
@@ -226,6 +239,9 @@ function add_location(s::SeisData,df::DataFrame)
         println(e)
     end
 end
+
+
+
 function rfft_raw(R::RawData,dims::Int=1)
     FFT = rfft(R.x,dims)
     FFT ./= rfftfreq(size(R.x,1), R.fs) .* 1im .* 2π # Integrate the accelerometers!
@@ -234,6 +250,9 @@ function rfft_raw(R::RawData,dims::Int=1)
                     R.cc_len, R.cc_step, R.whitened, R.time_norm, R.resp,
                     R.misc, R.notes, R.t, FFT)
 end
+
+
+
 function cc_medianmute(A::AbstractArray, cc_medianmute_α::Float64 = 10.0)
     """
         Remove noisy correlation windows before stacking
@@ -246,15 +265,24 @@ function cc_medianmute(A::AbstractArray, cc_medianmute_α::Float64 = 10.0)
     return A[:, inds], inds
 end
 remove_medianmute(C::CorrData, inds) = (return C.t[inds])
+
+
+
 function cc_medianmute!(C::CorrData, cc_medianmute_α::Float64 = 10.0)
     C.corr, inds = cc_medianmute(C.corr, cc_medianmute_α)
     C.t = remove_medianmute(C, inds)
     return nothing
 end
+
+
+
 function name_corr(C::CorrData)
     """ Returns corr name string: CH1.STA1.LOC1.CH2.STA2.LOC2 """
     return strip(join(deleteat!(split(C.name,"."),[4,8]),"."),'.')
 end
+
+
+
 function save_named_corr(C::CorrData, CORROUT::String)
     """ Implements custom naming scheme for project """
     CORROUT = expanduser(CORROUT) # ensure file directory exists
@@ -277,6 +305,9 @@ function save_named_corr(C::CorrData, CORROUT::String)
     end
     close(file)
 end
+
+
+
 function load_corrs(file_list::Array{String,1})
     corrs_in_pair = Array{CorrData,1}(undef, length(file_list))
     for (index, name) in enumerate(file_list)
@@ -285,6 +316,9 @@ function load_corrs(file_list::Array{String,1})
     end
     return corrs_in_pair
 end
+
+
+
 function write_jld2(corr_folder::String, file_dir::String)
     pair_corr_names = glob("$corr_folder/*/*.jld2","CORR")
     pair_corrs = load_corrs(pair_corr_names)
@@ -305,6 +339,9 @@ function write_jld2(corr_folder::String, file_dir::String)
     end
     close(fo)
 end
+
+
+
 function foldersize(dir=".")
     """ returns total size of folder in GB """
     size = 0
@@ -313,6 +350,8 @@ function foldersize(dir=".")
     end
     return size*10e-10
 end
+
+
 
 function list_name(s::String)
     name = convert(String, split(s,"/")[end])

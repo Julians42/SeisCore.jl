@@ -15,6 +15,9 @@ function correlate_pair(src::FFTData, rec::FFTData, pref::String="CORR", params:
         println(e)
     end
 end
+
+
+
 function autocorrelate(station::String, list::Array{String,1}=fft_list_100, params::Dict=params)
     """ Filter channels by station, load and correlate """
     channels = filter(x -> occursin(station, x), list)
@@ -22,6 +25,9 @@ function autocorrelate(station::String, list::Array{String,1}=fft_list_100, para
     pairs = vec([collect(x) for x in Iterators.product(1:length(ffts),1:length(ffts))])
     map(pair -> correlate_pair(ffts[pair[1]], ffts[pair[2]], "AUTOCORR", params), pairs)
 end
+
+
+
 function diag_chunks(chunk::Array{String,1}, prefix::String = "CORR", filt_dist::Bool = true, params::Dict=params)
     ffts  = map(x -> load_fft(x, string(x[end-7:end-5])), chunk)
     pairs = vec([collect(x) for x in Iterators.product(1:length(ffts),1:length(ffts))])
@@ -30,6 +36,9 @@ function diag_chunks(chunk::Array{String,1}, prefix::String = "CORR", filt_dist:
     if filt_dist; filter!(x -> get_dist(ffts[x[1]], ffts[x[2]]) <= 300., pairs); end # filter distances
     map(pair -> correlate_pair(ffts[pair[1]], ffts[pair[2]], prefix, params), pairs)
 end
+
+
+
 function offdiag_chunks(chunkpair::Array{Array{String, 1}}, prefix::String = "CORR", filt_dist::Bool = true, 
                         params::Dict=params) 
     sources   = map(x -> load_fft(x, string(x[end-7:end-5])), chunkpair[1]) # load
@@ -38,6 +47,9 @@ function offdiag_chunks(chunkpair::Array{Array{String, 1}}, prefix::String = "CO
     if filt_dist; filter!(x -> get_dist(sources[x[1]].loc, receivers[x[2]].loc) <= 300., pairs); end # filt distances
     map(pair -> correlate_pair(sources[pair[1]], receivers[pair[2]], prefix, params), pairs)
 end
+
+
+
 function get_blocks(paths::Array{String,1}, params::Dict=params)
     # Chunk raw ffts into blocks. 30 is best size for IO, but distribute across cores if more cores available
     chunks = collect(Iterators.partition(paths, 30))#convert(Int64, minimum([30, ceil(length(paths)/params["num_procs"])]))))
@@ -47,6 +59,8 @@ function get_blocks(paths::Array{String,1}, params::Dict=params)
     off_chunk_names = map(chunk -> [collect(chunks[chunk[1]]), collect(chunks[chunk[2]])], off_chunks)
     return chunks, off_chunk_names
 end
+
+
 
 # preprocessing
 function preprocess2(file::String, accelerometer::Bool=false, params::Dict=params, path::String=path)
@@ -105,6 +119,8 @@ function preprocess2(file::String, accelerometer::Bool=false, params::Dict=param
         println(e)
     end
 end
+
+
 
 # stacking codes
 function stack_auto(name::String, startdate::Date=startdate)
@@ -166,6 +182,9 @@ function stack_auto(name::String, startdate::Date=startdate)
         # end
     end
 end
+
+
+
 function stack_corr(name::String, startdate::Date=startdate, prefix::String = "CORR_20HZ")
     month = Dates.monthname(startdate) # get month for filename
     yr = Dates.year(startdate)
@@ -238,6 +257,9 @@ function stack_corr(name::String, startdate::Date=startdate, prefix::String = "C
         end
     end
 end
+
+
+
 function stack_all(params::Dict=params)
     autocorr_names = [join(split(split(auto, "/")[end], ".")[1:2],".") for auto in glob("AUTOCORR/*", params["rootdir"])]
     @eval @everywhere autocorr_names = $autocorr_names
@@ -252,6 +274,8 @@ function stack_all(params::Dict=params)
     S1 = @elapsed robust_pmap(x -> stack_corr(x, startdate), corr_names_lf)
     println("Stacking Completed for autocorrs and interstation cross correlations in $(Sauto+S20+S1) seconds")
 end
+
+
 
 # wrapper function for correlations
 function correlate_big(dd::Date, startdate::Date = startdate, params::Dict = params)

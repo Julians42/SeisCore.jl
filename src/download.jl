@@ -3,7 +3,9 @@ export download_data, get_scedc_files, query_name, get_dict_name, query_FDSN, ev
 
 
 function download_data(station, source::String, dday::Date, yr::Int64, path::String, aws::AWSConfig, rootdir::String="")
-    """ Stream data from IRIS and NCEDC servers to local and then to seisbasin """
+    """ Stream data from IRIS and NCEDC servers to local and then to seisbasin 
+        Works only for IRIS and NCEDC. For data from SCEDE, refer to func get_seisdata().
+    """
     try
         data = get_data("FDSN", station, src=source, s=string(dday), t = string(dday+Day(1)))
         println("Downloaded data for $station on $dday")
@@ -50,7 +52,17 @@ function download_data(station, source::String, dday::Date, yr::Int64, path::Str
         println("Cannot download file!")
     end
 end
+
+
+
 function get_scedc_files(dd::Date, aws::AWSConfig)
+    """ Get filelist of all available SCEDC ms data from SCEDC at a given date dd.
+        For now, the function only query CI network.
+
+        dd::Date
+        aws:AWSConfig
+        return::Array{String, 1}
+    """
     ar_filelist = map(x -> s3query(aws, dd, enddate = dd, network="CI", channel=x),["BH?", "HH?"])
     filelist_scedc_BH = ar_filelist[1]
     filelist_scedc_HH = ar_filelist[2]
@@ -63,10 +75,25 @@ function get_scedc_files(dd::Date, aws::AWSConfig)
     HH_dict = Dict([(name, file) for (name, file) in zip(HH_keys, filelist_scedc_HH)]) 
     BH_dict = Dict([(name, file) for (name, file) in zip(BH_keys, filelist_scedc_BH)]) 
     filelist_dict = merge(HH_dict, BH_dict) # BH dict overwrite HH_dict. This is essentually the union
+    
+    #As Julia grammer indicates, the rightmost channel will replace the leftmost one.
+    #But why do we need to overwrite BH with HH ?
+    
     filelist_scedc = collect(values(filelist_dict)) # return values as array for download
     return filelist_scedc
 end
+
+
+
 function query_name(s::String, full::Bool)
+    """ Split AWS SCEDC-PDS style key into net.cha.sta.comp style.
+        s::String
+            e.g. "continuous_waveforms/2019/2019_034/AZBZN__BHE___2019034.ms"
+        full::Bool
+            Decide whether to return station's code
+        return::String
+            e.g. "AZ.BZN..E"
+    """
     name = convert(String, split(s,"/")[end])
     net, cha, sta, comp = name[1:2], strip(convert(String, name[3:6]),'_'), 
                           strip(convert(String, name[11:12]),'_'), name[10]
@@ -76,29 +103,48 @@ function query_name(s::String, full::Bool)
         return join([net, cha, comp],".") #comp - add back in for type 
     end
 end
+
+
+
 function get_dict_name(file::String)
     """ Helper function for get_scedc_files"""
     station = convert(String, split(split(file,"/")[end],"_")[1])
     component = split(file,"/")[end][10:12]
     return string(station, "_", component)
 end
+
+
+
 function query_FDSN(file_str::String, src::String, dday::Date)
-    """ Query NCEDC and IRIS for metadata. Try twice """
+    """ Query NCEDC and IRIS for metadata. Try twice 
+
+        file_str::String
+            e.g. "UW.*.*.BH*"
+        string::String
+            e.g. "IRIS", "SCEDC", "NCEDC"
+        dday::Date
+            e.g. Date("2021-01-01"), Date("2021-01-01T12:29:00")
+
+        return::Array{String, 1}:
+            "CI.PER..BHE"
+            "CI.PER..BHN"
+            "CI.PER..BHZ"
+    """
     println("Beginning metadata download for $src ($file_str).")
     try
         if src in ["SCEDC","NCEDC"]
-            return FDSNsta(file_str, src=src, s = string(dday), t = string(dday+Day(1))).id
+            return FDSNsta(file_str, src=src, s = string(dday), t = string(dday+Day(1)), reg=[31.,40.,-123.,-116.]).id
         else # then data is IRIS so we filter to region
-            return FDSNsta(file_str,src=src, s = string(dday), t = string(dday+Day(1)), reg=[31.,40.,-123.,-116.]).id
+            return FDSNsta(file_str,src=src, s = string(dday), t = string(dday+Day(1))).id
         end
     catch e
         println(e)
         println("Could not download metadata for $file_str from $src on $dday.")
         try
             if src in ["SCEDC","NCEDC"]
-                return FDSNsta(file_str, src=src, s = string(dday), t = string(dday+Day(1))).id
+                return FDSNsta(file_str, src=src, s = string(dday), t = string(dday+Day(1)), reg=[31.,40.,-123.,-116.]).id
             else # then data is IRIS so we filter to region
-                return FDSNsta(file_str,src=src, s = string(dday), t = string(dday+Day(1)), reg=[31.,40.,-123.,-116.]).id
+                return FDSNsta(file_str,src=src, s = string(dday), t = string(dday+Day(1))).id
             end
         catch
             println("Could not download metadata for $file_str from $src on $dday.")
@@ -106,6 +152,9 @@ function query_FDSN(file_str::String, src::String, dday::Date)
         end
     end
 end
+
+
+
 function evaluate_done(yr::Int64, path::String, aws::AWSConfig)
     try
         #iris_query = [elt["Key"] for elt in collect(s3_list_objects(aws, "seisbasin", "iris_waveforms/$yr/$path/", max_items=1000))]
@@ -126,9 +175,15 @@ function evaluate_done(yr::Int64, path::String, aws::AWSConfig)
         return false
     end
 end
+
+
+
 function get_seisdata(date::Date, aws::AWSConfig, data_sources::Array{Array{String,1},1}=[["*.*.*.HH*","NCEDC"],["*.*.*.BH*","NCEDC"],
             ["*.*.*.HH*","IRIS"],["*.*.*.BH*","IRIS"]], rootdir::String="")
-    """ Downloads available seismic data from NCEDC and IRIS for given date. Uploads data to seisbasin """
+    """ Downloads available seismic data from NCEDC and IRIS for given date. Uploads data to seisbasin 
+        Also update csv (only) info from SCEDC to seisbasin.
+    
+    """
     try 
         yr = Dates.year(date)
         path = join([Dates.year(date),lpad(Dates.dayofyear(date),3,"0")],"_") # Yeilds "YEAR_JDY"
