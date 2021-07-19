@@ -116,7 +116,7 @@ end
 
 
 function query_FDSN(file_str::String, src::String, dday::Date)
-    """ Query NCEDC and IRIS for metadata. Try twice 
+    """ Query SCEDC/NCEDC and IRIS for metadata. Try twice 
 
         file_str::String
             e.g. "UW.*.*.BH*"
@@ -133,17 +133,33 @@ function query_FDSN(file_str::String, src::String, dday::Date)
     println("Beginning metadata download for $src ($file_str).")
     try
         if src in ["SCEDC","NCEDC"]
-            return FDSNsta(file_str, src=src, s = string(dday), t = string(dday+Day(1)), reg=[31.,40.,-123.,-116.]).id
+            """
+                As most SCEDC/NCEDC network could be found in a relatively small region,
+                we restrict the region for faster query.
+            """
+            if file_str[1:2] ∉ ["CJ", "MX", "NP", "NR", "PB", "RB", "SB", "TA", "UL"]
+                # then the region works for network from SCEDC/NCEDC. 
+                return FDSNsta(file_str, src=src, s = string(dday), t = string(dday+Day(1)), reg = [30., 45., -126., -112.]).id
+            else
+                # not much stations are beyonds the region.
+                return FDSNsta(file_str, src=src, s = string(dday), t = string(dday+Day(1))).id
+            end
         else # then data is IRIS so we filter to region
+             # not much can be done for general stations from IRIS...
             return FDSNsta(file_str,src=src, s = string(dday), t = string(dday+Day(1))).id
         end
     catch e
         println(e)
         println("Could not download metadata for $file_str from $src on $dday.")
+        println("Second trail.")
         try
             if src in ["SCEDC","NCEDC"]
-                return FDSNsta(file_str, src=src, s = string(dday), t = string(dday+Day(1)), reg=[31.,40.,-123.,-116.]).id
-            else # then data is IRIS so we filter to region
+                if file_str[1:2] ∉ ["CJ", "MX", "NP", "NR", "PB", "RB", "SB", "TA", "UL"]
+                    return FDSNsta(file_str, src=src, s = string(dday), t = string(dday+Day(1)), reg = [30., 45., -126., -112.]).id
+                else
+                    return FDSNsta(file_str, src=src, s = string(dday), t = string(dday+Day(1))).id
+                end
+            else
                 return FDSNsta(file_str,src=src, s = string(dday), t = string(dday+Day(1))).id
             end
         catch
