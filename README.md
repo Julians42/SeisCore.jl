@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/358739945.svg)](https://doi.org/10.5281/zenodo.15276501)
+
 # SeisCore :earth_americas: :cloud: :ski:
 **SeisCore.jl** is a Julia Package for our [C4 Project](https://github.com/Julians42/C4-Project.jl). Optimized for HPC on AWS EC2 and Batch. 
 
